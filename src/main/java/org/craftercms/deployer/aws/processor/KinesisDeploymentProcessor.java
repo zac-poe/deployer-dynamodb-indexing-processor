@@ -220,7 +220,7 @@ public class KinesisDeploymentProcessor extends AbstractMainDeploymentProcessor 
      * {@inheritDoc}
      */
     protected boolean failDeploymentOnProcessorFailure() {
-        return false;
+        return true;
     }
 
     /**
