@@ -4,7 +4,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.craftercms.deployer.api.Deployment;
 import org.craftercms.deployer.api.DeploymentService;
+import org.craftercms.deployer.api.exceptions.DeploymentServiceException;
+import org.craftercms.deployer.api.exceptions.TargetNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.amazonaws.services.kinesis.model.Record;
@@ -56,14 +59,12 @@ public class DeploymentKinesisProcessor extends AbstractKinesisRecordProcessor {
      * {@inheritDoc}
      */
     @Override
-    public void processRecords(final List<Record> records) {
+    public boolean processRecords(final List<Record> records) throws TargetNotFoundException,
+        DeploymentServiceException {
         Map<String, Object> params = new HashMap<>();
         params.put(RECORDS_PARAM_NAME, records);
-        try {
-            deploymentService.deployTarget(environment, siteName, waitTillDone, params);
-        } catch (Exception e) {
-            logger.error("Error deploying records", e);
-        }
+        Deployment deployment = deploymentService.deployTarget(environment, siteName, waitTillDone, params);
+        return deployment.getStatus() == Deployment.Status.SUCCESS;
     }
 
 }

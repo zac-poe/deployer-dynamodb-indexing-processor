@@ -2,6 +2,8 @@ package org.craftercms.deployer.aws.kinesis;
 
 import java.util.List;
 
+import org.craftercms.deployer.api.exceptions.DeploymentServiceException;
+import org.craftercms.deployer.api.exceptions.TargetNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.amazonaws.services.kinesis.clientlibrary.exceptions.InvalidStateException;
@@ -46,11 +48,13 @@ public abstract class AbstractKinesisRecordProcessor implements IRecordProcessor
         List<Record> records = processRecordsInput.getRecords();
         logger.info("Processing {} records from {}", records.size(), kinesisShardId);
 
-        processRecords(records);
-
-        if (System.currentTimeMillis() > nextCheckpointTimeInMillis) {
-            checkpoint(processRecordsInput.getCheckpointer());
-            nextCheckpointTimeInMillis = System.currentTimeMillis() + CHECKPOINT_INTERVAL_MILLIS;
+        try {
+            if (processRecords(records) && System.currentTimeMillis() > nextCheckpointTimeInMillis) {
+                checkpoint(processRecordsInput.getCheckpointer());
+                nextCheckpointTimeInMillis = System.currentTimeMillis() + CHECKPOINT_INTERVAL_MILLIS;
+            }
+        } catch (Exception e) {
+            logger.error("Error processing records", e);
         }
     }
 
@@ -111,6 +115,7 @@ public abstract class AbstractKinesisRecordProcessor implements IRecordProcessor
      *
      * @param records List of records to process
      */
-    public abstract void processRecords(List<Record> records);
+    public abstract boolean processRecords(List<Record> records) throws TargetNotFoundException,
+        DeploymentServiceException;
 
 }

@@ -35,7 +35,7 @@ public class DeploymentKinesisProcessorFactory implements IRecordProcessorFactor
      * {@inheritDoc}
      */
     public IRecordProcessor createProcessor() {
-        return new DeploymentKinesisProcessor(environment, siteName, false, deploymentService);
+        return new DeploymentKinesisProcessor(environment, siteName, true, deploymentService);
     }
 
 }
