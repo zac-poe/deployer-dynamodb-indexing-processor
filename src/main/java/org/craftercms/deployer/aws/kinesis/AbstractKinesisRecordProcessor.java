@@ -2,8 +2,6 @@ package org.craftercms.deployer.aws.kinesis;
 
 import java.util.List;
 
-import org.craftercms.deployer.api.exceptions.DeploymentServiceException;
-import org.craftercms.deployer.api.exceptions.TargetNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.amazonaws.services.kinesis.clientlibrary.exceptions.InvalidStateException;
@@ -32,6 +30,7 @@ public abstract class AbstractKinesisRecordProcessor implements IRecordProcessor
 
     protected long nextCheckpointTimeInMillis;
     protected String kinesisShardId;
+    protected boolean failed = false;
 
     /**
      * {@inheritDoc}
@@ -45,16 +44,25 @@ public abstract class AbstractKinesisRecordProcessor implements IRecordProcessor
      * {@inheritDoc}
      */
     public void processRecords(final ProcessRecordsInput processRecordsInput) {
+        if(failed) {
+            logger.warn("A previous operation resulted in an error, no records will be processed");
+            return;
+        }
         List<Record> records = processRecordsInput.getRecords();
         logger.info("Processing {} records from {}", records.size(), kinesisShardId);
 
         try {
-            if (processRecords(records) && System.currentTimeMillis() > nextCheckpointTimeInMillis) {
-                checkpoint(processRecordsInput.getCheckpointer());
-                nextCheckpointTimeInMillis = System.currentTimeMillis() + CHECKPOINT_INTERVAL_MILLIS;
+            if(processRecords(records)) {
+                if (System.currentTimeMillis() > nextCheckpointTimeInMillis) {
+                    checkpoint(processRecordsInput.getCheckpointer());
+                    nextCheckpointTimeInMillis = System.currentTimeMillis() + CHECKPOINT_INTERVAL_MILLIS;
+                }
+            } else {
+                failed = true;
             }
         } catch (Exception e) {
             logger.error("Error processing records", e);
+            failed = true;
         }
     }
 
@@ -63,7 +71,7 @@ public abstract class AbstractKinesisRecordProcessor implements IRecordProcessor
      */
     public void shutdown(final ShutdownInput shutdownInput) {
         logger.info("Shutting down");
-        if (shutdownInput.getShutdownReason() == ShutdownReason.TERMINATE) {
+        if (!failed && shutdownInput.getShutdownReason() == ShutdownReason.TERMINATE) {
             try {
                 shutdownInput.getCheckpointer().checkpoint();
             }
@@ -115,7 +123,6 @@ public abstract class AbstractKinesisRecordProcessor implements IRecordProcessor
      *
      * @param records List of records to process
      */
-    public abstract boolean processRecords(List<Record> records) throws TargetNotFoundException,
-        DeploymentServiceException;
+    public abstract boolean processRecords(List<Record> records) throws Exception;
 
 }
