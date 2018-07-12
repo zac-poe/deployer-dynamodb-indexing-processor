@@ -17,6 +17,11 @@ public abstract class AwsConfig {
     public static final String REGION_CONFIG_KEY = "region";
     public static final String DYNAMODB_STREAM_CONFIG_KEY = "dynamoStream";
 
+    public static final String WORKERS_CONFIG_KEY = "aws.kinesis.workers";
+    public static final String WORKER_APP_NAME_CONFIG_KEY = "appName";
+    public static final String WORKER_WORKER_ID_CONFIG_KEY = "workerId";
+    public static final String WORKER_STREAM_CONFIG_KEY = "stream";
+
     public static boolean getUseDynamo(final Configuration config) {
         return config.getBoolean(DYNAMODB_STREAM_CONFIG_KEY, false);
     }

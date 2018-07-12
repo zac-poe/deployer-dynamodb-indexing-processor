@@ -4,9 +4,16 @@
 
 Developed based on the sample project https://github.com/aws/aws-sdk-java/tree/master/src/samples/AmazonKinesis
 
+## Usage
+
+Build de project by running `mvn clean package` and then copy the `target/deployer-aws-processors-{VERSION}.jar` file 
+to `$INSTALL_DIR/bin/crafter-deployer/lib`.
+
 ## Example Configuration
 
 ### Target Context
+
+The following beans need to be added to the target context configuration:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -29,6 +36,17 @@ Developed based on the sample project https://github.com/aws/aws-sdk-java/tree/m
 
 ### Target Configuration
 
+At least one worker must be defined under `aws.kinesis.workers`. The Kinesis Client Library configuration must follow
+these restrictions:
+
+- `workerId` must be unique for a given `appName`
+- all workers under the same `appName` use the same `stream`
+- because `appName` will be used internally as a DynamoDB table it must be unique for the given `region`
+- the credentials used must have the required permissions for both Kinesis & DynamoDB
+
+`aws.intialPosition` is only needed if the processor should handle all pending records when it starts, the default
+behaviour is to only receive new ones after it is started.
+
 ```yaml
 aws:
   credentials:
@@ -37,21 +55,21 @@ aws:
   region: us-west-1
   kinesis:
     workers:
-      - crafter-deployer-shows
-      - crafter-deployer-shows-worker-1 
-      - arn:aws:dynamodb:us-west-1:608786675545:table/people/stream/2018-07-12T14:25:35.434
-      - crafter-deployer-clips
-      - crafter-deployer-clips-worker-1
-      - arn:aws:dynamodb:us-west-1:608786675545:table/pets/stream/2018-07-12T14:39:10.573
+      - appName: crafter-deployer-shows
+        workerId: crafter-deployer-shows-worker-1
+        stream: arn:aws:dynamodb:us-west-1:608786675545:table/people/stream/2018-07-12T14:25:35.434
+      - appName: crafter-deployer-clips
+        workerId: crafter-deployer-clips-worker-1
+        stream: arn:aws:dynamodb:us-west-1:608786675545:table/pets/stream/2018-07-12T14:39:10.573
     initialPosition: TRIM_HORIZON
     useDynamo: true
+
 target:
-  env: aws
-  siteName: test
-  deployment:
-    scheduling:
-       enabled: false
+    # ... usual target configuration ...
+    
     pipeline:
+      # .. usual processors ...
+      
       - processorName: kinesisIndexingProcessor
         dynamoStream: ${aws.kinesis.useDynamo}
       - processorName: dynamoIndexingProcessor
