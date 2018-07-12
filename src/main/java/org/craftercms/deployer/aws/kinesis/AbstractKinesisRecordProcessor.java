@@ -44,10 +44,6 @@ public abstract class AbstractKinesisRecordProcessor implements IRecordProcessor
      * {@inheritDoc}
      */
     public void processRecords(final ProcessRecordsInput processRecordsInput) {
-        if(failed) {
-            logger.warn("A previous operation resulted in an error, no records will be processed");
-            return;
-        }
         List<Record> records = processRecordsInput.getRecords();
         logger.info("Processing {} records from {}", records.size(), kinesisShardId);
 

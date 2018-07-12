@@ -3,6 +3,8 @@ package org.craftercms.deployer.aws.utils;
 import java.util.Map;
 
 import org.craftercms.search.service.SearchService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.amazonaws.services.dynamodbv2.document.ItemUtils;
 import com.amazonaws.services.kinesis.model.Record;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
@@ -14,6 +16,8 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper;
  */
 @SuppressWarnings("rawtypes")
 public class SearchHelper {
+
+    private static final Logger logger = LoggerFactory.getLogger(SearchHelper.class);
 
     /**
      * Mapper used to generate documents as XML.
@@ -34,6 +38,7 @@ public class SearchHelper {
     public void update(SearchService searchService, String siteName, Map map) throws Exception {
         // Id need to be removed because searchService will generate it.
         String id = (String) map.remove("id");
+        logger.debug("Indexing doc with id '{}'", id);
         String xml = xmlMapper.writeValueAsString(map);
         searchService.update(siteName, siteName, id, xml, true);
     }

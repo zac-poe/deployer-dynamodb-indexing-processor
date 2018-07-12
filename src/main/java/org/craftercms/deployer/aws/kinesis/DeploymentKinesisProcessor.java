@@ -61,6 +61,7 @@ public class DeploymentKinesisProcessor extends AbstractKinesisRecordProcessor {
     @Override
     public boolean processRecords(final List<Record> records) throws TargetNotFoundException,
         DeploymentServiceException {
+        logger.info("Triggering deployment for '{}-{}'", environment, siteName);
         Map<String, Object> params = new HashMap<>();
         params.put(RECORDS_PARAM_NAME, records);
         Deployment deployment = deploymentService.deployTarget(environment, siteName, waitTillDone, params);

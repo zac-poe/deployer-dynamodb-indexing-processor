@@ -18,7 +18,7 @@ Developed based on the sample project https://github.com/aws/aws-sdk-java/tree/m
 
     <bean id="kinesisFactory" class="org.craftercms.deployer.aws.kinesis.DeploymentKinesisProcessorFactory"/>
 
-    <bean id="kinesisWorkerProcessor" class="org.craftercms.deployer.aws.processor.KinesisWorkerProcessor" parent="deploymentProcessor"/>
+    <bean id="kinesisWorkerManager" class="org.craftercms.deployer.aws.kinesis.KinesisWorkerManager"/>
 
     <bean id="kinesisIndexingProcessor" class="org.craftercms.deployer.aws.processor.KinesisIndexingProcessor" parent="deploymentProcessor"/>
     
@@ -31,9 +31,20 @@ Developed based on the sample project https://github.com/aws/aws-sdk-java/tree/m
 
 ```yaml
 aws:
+  credentials:
+    accessKey: ...
+    secretKey: ...
   region: us-west-1
-  accessKey: ...
-  secretKey: ...
+  kinesis:
+    workers:
+      - crafter-deployer-shows
+      - crafter-deployer-shows-worker-1 
+      - arn:aws:dynamodb:us-west-1:608786675545:table/people/stream/2018-07-12T14:25:35.434
+      - crafter-deployer-clips
+      - crafter-deployer-clips-worker-1
+      - arn:aws:dynamodb:us-west-1:608786675545:table/pets/stream/2018-07-12T14:39:10.573
+    initialPosition: TRIM_HORIZON
+    useDynamo: true
 target:
   env: aws
   siteName: test
@@ -41,25 +52,15 @@ target:
     scheduling:
        enabled: false
     pipeline:
-      - processorName: kinesisWorkerProcessor
-        appName: crafter-deployer
-        streamName: ...
-        credentials:
-          accessKey: ${aws.accessKey}
-          secretKey: ${aws.secretKey}
-        region: ${aws.region}
-        workerId: crafter-deployer-localhost
-        initialPosition: TRIM_HORIZON
-        dynamoStream: true
       - processorName: kinesisIndexingProcessor
-        dynamoStream: true
+        dynamoStream: ${aws.kinesis.useDynamo}
       - processorName: dynamoIndexingProcessor
         tables:
           - shows
           - clips
         credentials:
-          accessKey: ${aws.accessKey}
-          secretKey: ${aws.secretKey}
+          accessKey: ${aws.credentials.accessKey}
+          secretKey: ${aws.credentials.secretKey}
         region: ${aws.region}
 
 ```

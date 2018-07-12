@@ -9,7 +9,9 @@ import org.craftercms.deployer.api.Deployment;
 import org.craftercms.deployer.api.ProcessorExecution;
 import org.craftercms.deployer.api.exceptions.DeployerException;
 import org.craftercms.deployer.aws.kinesis.DeploymentKinesisProcessor;
+import org.craftercms.deployer.aws.kinesis.KinesisWorkerManager;
 import org.craftercms.deployer.aws.utils.AwsConfig;
+import org.craftercms.deployer.aws.utils.Retry;
 import org.craftercms.deployer.aws.utils.SearchHelper;
 import org.craftercms.deployer.impl.processors.AbstractMainDeploymentProcessor;
 import org.craftercms.search.service.SearchService;
@@ -31,7 +33,7 @@ import com.amazonaws.services.kinesis.model.Record;
  *
  * @author joseross
  */
-@SuppressWarnings("unchecked")
+@SuppressWarnings({"unchecked", "rawtypes"})
 public class KinesisIndexingProcessor extends AbstractMainDeploymentProcessor {
 
     private static final Logger logger = LoggerFactory.getLogger(KinesisIndexingProcessor.class);
@@ -42,6 +44,9 @@ public class KinesisIndexingProcessor extends AbstractMainDeploymentProcessor {
 
     @Autowired
     protected SearchService searchService;
+
+    @Autowired
+    protected KinesisWorkerManager workerManager;
 
     /**
      * {@inheritDoc}
@@ -58,7 +63,7 @@ public class KinesisIndexingProcessor extends AbstractMainDeploymentProcessor {
 
         List<Record> records = (List<Record>) deployment.getParam(DeploymentKinesisProcessor.RECORDS_PARAM_NAME);
         for(Record record : records) {
-            try {
+            Retry.untilTrue(() -> {
                 Map map;
                 if (useDynamo) {
                     RecordAdapter adapter = (RecordAdapter)record;
@@ -71,12 +76,26 @@ public class KinesisIndexingProcessor extends AbstractMainDeploymentProcessor {
                 } else {
                     map = searchHelper.getDocFromKinesis(record);
                 }
-                searchHelper.update(searchService, siteName, map);
-            } catch (Exception e) {
-                throw new DeployerException("Error processing record", e);
-            }
+                try {
+                    logger.debug("Indexing doc with id '{}'", map.get("id"));
+                    searchHelper.update(searchService, siteName, map);
+                    return true;
+                } catch (Exception e) {
+                    logger.warn("Indexing failed, will retry");
+                    return false;
+                }
+            });
         }
-        searchService.commit(siteName);
+        Retry.untilTrue(() -> {
+           try {
+               logger.debug("Committing all changes for site '{}'", siteName);
+               searchService.commit(siteName);
+               return true;
+           } catch (Exception e) {
+               logger.warn("Commit failed, will retry");
+               return false;
+           }
+        });
 
         return null;
     }
@@ -92,7 +111,7 @@ public class KinesisIndexingProcessor extends AbstractMainDeploymentProcessor {
      * {@inheritDoc}
      */
     public void destroy() throws DeployerException {
-
+        workerManager.shutdown();
     }
 
     /**
