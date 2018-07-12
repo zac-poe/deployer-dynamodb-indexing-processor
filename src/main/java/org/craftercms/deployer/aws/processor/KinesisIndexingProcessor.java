@@ -81,7 +81,7 @@ public class KinesisIndexingProcessor extends AbstractMainDeploymentProcessor {
                     searchHelper.update(searchService, siteName, map);
                     return true;
                 } catch (Exception e) {
-                    logger.warn("Indexing failed, will retry");
+                    logger.warn("Indexing failed, will retry", e);
                     return false;
                 }
             });
@@ -92,7 +92,7 @@ public class KinesisIndexingProcessor extends AbstractMainDeploymentProcessor {
                searchService.commit(siteName);
                return true;
            } catch (Exception e) {
-               logger.warn("Commit failed, will retry");
+               logger.warn("Commit failed, will retry", e);
                return false;
            }
         });

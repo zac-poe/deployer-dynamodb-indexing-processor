@@ -9,6 +9,7 @@ import org.craftercms.deployer.api.Deployment;
 import org.craftercms.deployer.api.ProcessorExecution;
 import org.craftercms.deployer.api.exceptions.DeployerException;
 import org.craftercms.deployer.aws.utils.AwsConfig;
+import org.craftercms.deployer.aws.utils.Retry;
 import org.craftercms.deployer.aws.utils.SearchHelper;
 import org.craftercms.deployer.impl.DeploymentConstants;
 import org.craftercms.deployer.impl.processors.AbstractMainDeploymentProcessor;
@@ -81,19 +82,27 @@ public class DynamoIndexingProcessor extends AbstractMainDeploymentProcessor {
             ScanRequest request = new ScanRequest().withTableName(table);
             ScanResult result = client.scan(request);
             logger.info("Found {} items", result.getCount());
-            for(Map map : result.getItems()) {
-                try {
-                    searchHelper.update(searchService, siteName, ItemUtils.toItem(map).asMap());
-                } catch (Exception e) {
-                    logger.error("Error processing record", e);
-                }
+            for(Map map : result.getItems()){
+                Retry.untilTrue(() -> {
+                    try {
+                        searchHelper.update(searchService, siteName, ItemUtils.toItem(map).asMap());
+                        return true;
+                    } catch (Exception e) {
+                        logger.warn("Indexing failed, will retry", e);
+                        return false;
+                    }
+                });
             }
         }
-        try {
-            searchService.commit(siteName);
-        } catch (SearchException e) {
-            logger.error("Error committing changes", e);
-        }
+        Retry.untilTrue(() -> {
+            try {
+                searchService.commit(siteName);
+                return true;
+            } catch (SearchException e) {
+                logger.warn("Commit failed, will retry", e);
+                return false;
+            }
+        });
 
         return null;
     }
