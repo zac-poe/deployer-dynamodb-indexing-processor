@@ -2,7 +2,7 @@
 
 ## AWS Kinesis
 
-Developed based on the sample project https://github.com/aws/aws-sdk-java/tree/master/src/samples/AmazonKinesis
+Developed based on the [sample project](https://github.com/aws/aws-sdk-java/tree/master/src/samples/AmazonKinesis)
 
 ## Usage
 
@@ -46,6 +46,9 @@ these restrictions:
 
 `aws.intialPosition` is only needed if the processor should handle all pending records when it starts, the default
 behaviour is to only receive new ones after it is started.
+
+`aws.credentials` & `dynamoIndexingProcessor.credentials` are both optional, if they are not provided the default
+credential provider chain will be used. [More info](https://docs.aws.amazon.com/sdk-for-java/v1/developer-guide/credentials.html)
 
 ```yaml
 aws:

@@ -35,6 +35,7 @@ import org.craftercms.search.service.SearchService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
 import com.amazonaws.services.dynamodbv2.document.ItemUtils;
@@ -81,10 +82,13 @@ public class DynamoIndexingProcessor extends AbstractMainDeploymentProcessor {
     @Override
     protected void doInit(final Configuration config) throws DeployerException {
         tables = config.getList(String.class, TABLES_CONFIG_KEY);
-        client = AmazonDynamoDBClientBuilder.standard()
-            .withCredentials(AwsConfig.getCredentials(config))
-            .withRegion(AwsConfig.getRegionName(config))
-            .build();
+        AmazonDynamoDBClientBuilder builder = AmazonDynamoDBClientBuilder.standard()
+                                                .withRegion(AwsConfig.getRegionName(config));
+        AWSCredentialsProvider provider = AwsConfig.getCredentials(config);
+        if(provider != null) {
+            builder.withCredentials(provider);
+        }
+        client = builder.build();
     }
 
     /**
