@@ -44,10 +44,12 @@ public abstract class AwsConfig {
     }
 
     public static AWSCredentialsProvider getCredentials(final Configuration config) {
-        return new AWSStaticCredentialsProvider(new BasicAWSCredentials(
-            config.getString(ACCESS_KEY_CONFIG_KEY),
-            config.getString(SECRET_KEY_CONFIG_KEY)
-        ));
+        if(config.containsKey(ACCESS_KEY_CONFIG_KEY)) {
+            return new AWSStaticCredentialsProvider(new BasicAWSCredentials(config.getString(ACCESS_KEY_CONFIG_KEY),
+                config.getString(SECRET_KEY_CONFIG_KEY)));
+        } else {
+            return null;
+        }
     }
 
     public static String getRegionName(final Configuration config) {

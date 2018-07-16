@@ -25,12 +25,15 @@ import javax.annotation.PreDestroy;
 
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.HierarchicalConfiguration;
+import org.apache.commons.lang3.StringUtils;
 import org.craftercms.deployer.aws.utils.AwsConfig;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import com.amazonaws.auth.AWSCredentialsProvider;
+import com.amazonaws.auth.AWSCredentialsProviderChain;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
 import com.amazonaws.services.dynamodbv2.streamsadapter.AmazonDynamoDBStreamsAdapterClient;
 import com.amazonaws.services.kinesis.clientlibrary.interfaces.v2.IRecordProcessorFactory;
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.InitialPositionInStream;
@@ -54,13 +57,12 @@ public class KinesisWorkerManager {
     @Value("${aws.kinesis.useDynamo}")
     protected boolean useDynamo;
 
-    @Value("${aws.credentials.accessKey}")
+    @Value("${aws.credentials.accessKey:}")
     protected String accessKey;
 
-    @Value("${aws.credentials.secretKey}")
+    @Value("${aws.credentials.secretKey:}")
     protected String secretKey;
 
-    protected AWSCredentialsProvider credentials;
     protected Worker.Builder builder;
 
     protected ExecutorService executorService = Executors.newCachedThreadPool();
@@ -80,19 +82,24 @@ public class KinesisWorkerManager {
     @PostConstruct
     @SuppressWarnings("unchecked")
     public void init() {
-        credentials = new AWSStaticCredentialsProvider(new BasicAWSCredentials(accessKey, secretKey));
+        AWSCredentialsProvider provider;
+        if(StringUtils.isEmpty(accessKey)) {
+            provider = DefaultAWSCredentialsProviderChain.getInstance();
+        } else {
+            provider = new AWSStaticCredentialsProvider(new BasicAWSCredentials(accessKey, secretKey));
+        }
         List<Configuration> workers = targetConfig.configurationsAt(AwsConfig.WORKERS_CONFIG_KEY);
         workers.forEach(worker ->{
             String appName = worker.getString(AwsConfig.WORKER_APP_NAME_CONFIG_KEY);
             String workerId = worker.getString(AwsConfig.WORKER_WORKER_ID_CONFIG_KEY);
             String stream = worker.getString(AwsConfig.WORKER_STREAM_CONFIG_KEY);
             KinesisClientLibConfiguration configuration =
-                new KinesisClientLibConfiguration(appName, stream, credentials, workerId);
+                new KinesisClientLibConfiguration(appName, stream, provider, workerId);
             configuration.withRegionName(region);
             configuration.withInitialPositionInStream(initialPosition);
             builder = new Worker.Builder().recordProcessorFactory(processorFactory).config(configuration);
             if(useDynamo) {
-                builder.kinesisClient(new AmazonDynamoDBStreamsAdapterClient(credentials));
+                builder.kinesisClient(new AmazonDynamoDBStreamsAdapterClient(provider));
             }
             executorService.submit(builder.build());
         });
