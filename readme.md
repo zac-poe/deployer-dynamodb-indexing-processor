@@ -50,6 +50,9 @@ behaviour is to only receive new ones after it is started.
 `aws.credentials` & `dynamoIndexingProcessor.credentials` are both optional, if they are not provided the default
 credential provider chain will be used. [More info](https://docs.aws.amazon.com/sdk-for-java/v1/developer-guide/credentials.html)
 
+If `aws.kinesis.metrics.enabled` is set to true the credentials used need to include write permissions for AWS 
+CloudWatch. `aws.kinesis.metrics.level` must be a value from `NONE`, `SUMMARY` or `DETAILED`.
+
 ```yaml
 aws:
   credentials:
@@ -66,6 +69,9 @@ aws:
         stream: arn:aws:dynamodb:...
     initialPosition: TRIM_HORIZON
     useDynamo: true
+    metrics:
+      enabled: true
+      level: SUMMARY
 
 target:
     # ... usual target configuration ...
