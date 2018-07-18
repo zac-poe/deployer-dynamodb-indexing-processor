@@ -39,6 +39,8 @@ import com.amazonaws.services.kinesis.clientlibrary.interfaces.v2.IRecordProcess
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.InitialPositionInStream;
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.KinesisClientLibConfiguration;
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.Worker;
+import com.amazonaws.services.kinesis.metrics.impl.NullMetricsFactory;
+import com.amazonaws.services.kinesis.metrics.interfaces.MetricsLevel;
 
 /**
  * Manages all required instances of {@link Worker}.
@@ -56,6 +58,12 @@ public class KinesisWorkerManager {
 
     @Value("${aws.kinesis.useDynamo}")
     protected boolean useDynamo;
+
+    @Value("${aws.kinesis.metrics.enabled:false}")
+    protected boolean useMetrics;
+
+    @Value("${aws.kinesis.metrics.level:NONE}")
+    protected MetricsLevel metricsLevel;
 
     @Value("${aws.credentials.accessKey:}")
     protected String accessKey;
@@ -97,7 +105,13 @@ public class KinesisWorkerManager {
                 new KinesisClientLibConfiguration(appName, stream, provider, workerId);
             configuration.withRegionName(region);
             configuration.withInitialPositionInStream(initialPosition);
+            if(useMetrics) {
+                configuration.withMetricsLevel(metricsLevel);
+            }
             builder = new Worker.Builder().recordProcessorFactory(processorFactory).config(configuration);
+            if(!useMetrics) {
+                builder.metricsFactory(new NullMetricsFactory());
+            }
             if(useDynamo) {
                 builder.kinesisClient(new AmazonDynamoDBStreamsAdapterClient(provider));
             }
