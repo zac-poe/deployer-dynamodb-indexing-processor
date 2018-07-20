@@ -45,6 +45,12 @@ public class SearchHelper {
         xmlMapper = new XmlMapper();
     }
 
+
+    public void delete(SearchService searchService, String site,
+                       com.amazonaws.services.dynamodbv2.model.Record record) {
+        searchService.delete(site, site, ItemUtils.toItem(record.getDynamodb().getOldImage()).getString("id"));
+    }
+
     /**
      * Updates the search index for a given document.
      * @param searchService search service instance
