@@ -53,6 +53,8 @@ credential provider chain will be used. [More info](https://docs.aws.amazon.com/
 If `aws.kinesis.metrics.enabled` is set to true the credentials used need to include write permissions for AWS 
 CloudWatch. `aws.kinesis.metrics.level` must be a value from `NONE`, `SUMMARY` or `DETAILED`.
 
+In order to support delete events from DynamoDB the stream must be configured to include the old image of the records.
+
 ```yaml
 aws:
   credentials:

@@ -81,22 +81,27 @@ public class KinesisIndexingProcessor extends AbstractMainDeploymentProcessor {
         List<Record> records = (List<Record>) deployment.getParam(DeploymentKinesisProcessor.RECORDS_PARAM_NAME);
         for(Record record : records) {
             Retry.untilTrue(() -> {
-                Map map;
-                if (useDynamo) {
-                    RecordAdapter adapter = (RecordAdapter)record;
-                    com.amazonaws.services.dynamodbv2.model.Record dynamoRecord = adapter.getInternalObject();
-                    if (!"REMOVE".equals(dynamoRecord.getEventName())) {
-                        map = searchHelper.getDocFromDynamo(dynamoRecord);
-                    } else {
-                        throw new UnsupportedOperationException();
-                    }
-                } else {
-                    map = searchHelper.getDocFromKinesis(record);
-                }
                 try {
-                    logger.debug("Indexing doc with id '{}'", map.get("id"));
-                    searchHelper.update(searchService, siteName, map);
-                    return true;
+                    if (useDynamo) {
+                        RecordAdapter adapter = (RecordAdapter) record;
+                        com.amazonaws.services.dynamodbv2.model.Record dynamoRecord = adapter.getInternalObject();
+                        switch (dynamoRecord.getEventName()) {
+                            case "REMOVE":
+                                searchHelper.delete(searchService, siteName, dynamoRecord);
+                                break;
+                            case "INSERT":
+                            case "MODIFY":
+                                Map map;
+                                map = searchHelper.getDocFromDynamo(dynamoRecord);
+                                logger.debug("Indexing doc with id '{}'", map.get("id"));
+                                searchHelper.update(searchService, siteName, map);
+                                break;
+                        }
+                        return true;
+                    } else {
+                        searchHelper.update(searchService, siteName, searchHelper.getDocFromKinesis(record));
+                        return true;
+                    }
                 } catch (Exception e) {
                     logger.warn("Indexing failed, will retry", e);
                     return false;
