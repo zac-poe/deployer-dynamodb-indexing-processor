@@ -19,6 +19,7 @@ package org.craftercms.deployer.aws.utils;
 
 import java.util.Map;
 
+import org.apache.commons.lang.StringUtils;
 import org.craftercms.search.service.SearchService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,8 +32,9 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper;
  *
  * @author joseross
  */
-@SuppressWarnings("rawtypes")
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class SearchHelper {
+	private static final String ID_FIELD = "id";
 
     private static final Logger logger = LoggerFactory.getLogger(SearchHelper.class);
 
@@ -48,7 +50,17 @@ public class SearchHelper {
 
     public void delete(SearchService searchService, String site,
                        com.amazonaws.services.dynamodbv2.model.Record record) {
-        searchService.delete(site, site, ItemUtils.toItem(record.getDynamodb().getOldImage()).getString("id"));
+    	Map oldImage = record.getDynamodb().getOldImage();
+		if(oldImage == null) {
+        	logger.error("Unable to delete doc without old image from site '{}'!", site);
+        	return;
+		}
+		String id = ItemUtils.toItem(oldImage).getString("id");
+		if(StringUtils.isEmpty(id)) {
+        	logger.error("Unable to delete doc from site '{}' with no field '{}' defined!", site, ID_FIELD);
+        	return;
+		}
+        searchService.delete(site, site, id);
     }
 
     /**
@@ -60,7 +72,11 @@ public class SearchHelper {
      */
     public void update(SearchService searchService, String siteName, Map map) throws Exception {
         // Id need to be removed because searchService will generate it.
-        String id = (String) map.remove("id");
+        String id = (String) map.remove(ID_FIELD);
+        if(StringUtils.isEmpty(id)){
+        	logger.error("Unable to index doc for site '{}' with no field '{}' defined!", siteName, ID_FIELD);
+        	return;
+        }
         logger.debug("Indexing doc with id '{}'", id);
         String xml = xmlMapper.writeValueAsString(map);
         searchService.update(siteName, siteName, id, xml, true);
