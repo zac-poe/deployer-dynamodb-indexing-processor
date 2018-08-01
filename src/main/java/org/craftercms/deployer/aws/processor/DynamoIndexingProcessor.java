@@ -48,7 +48,7 @@ import com.amazonaws.services.dynamodbv2.model.ScanResult;
  *
  * @author joseross
  */
-@SuppressWarnings("unchecked")
+@SuppressWarnings({"unchecked", "rawtypes"})
 public class DynamoIndexingProcessor extends AbstractMainDeploymentProcessor {
 
     private static final Logger logger = LoggerFactory.getLogger(DynamoIndexingProcessor.class);
@@ -59,11 +59,6 @@ public class DynamoIndexingProcessor extends AbstractMainDeploymentProcessor {
      * Name of the tables to scan.
      */
     protected List<String> tables;
-
-    /**
-     * AWS DynamoDB client.
-     */
-    protected AmazonDynamoDB client;
 
     /**
      * Helper to perform indexing.
@@ -77,19 +72,29 @@ public class DynamoIndexingProcessor extends AbstractMainDeploymentProcessor {
     protected SearchService searchService;
 
     /**
+     * Configured region to connect to (provided in doInit)
+     */
+    private String region;
+
+    /**
+     * Configured credentials provider if using keys, otherwise will be null (provided in doInit)
+     */
+    private AWSCredentialsProvider credentialsProvider;
+
+    /**
      * {@inheritDoc}
      */
     @Override
     protected void doInit(final Configuration config) throws DeployerException {
         tables = config.getList(String.class, TABLES_CONFIG_KEY);
-        AmazonDynamoDBClientBuilder builder = AmazonDynamoDBClientBuilder.standard()
-                                                .withRegion(AwsConfig.getRegionName(config));
-        AWSCredentialsProvider provider = AwsConfig.getCredentials(config);
-        if(provider != null) {
-            builder.withCredentials(provider);
-        }
-        client = builder.build();
-    }
+        
+        //save state for connecting at execution time
+        region = AwsConfig.getRegionName(config);
+        credentialsProvider = AwsConfig.getCredentials(config);
+
+        logger.info("Connecting with " +
+    		(credentialsProvider != null ? "access keys" : "IAM role default credentials provider"));
+    }        
 
     /**
      * {@inheritDoc}
@@ -97,6 +102,8 @@ public class DynamoIndexingProcessor extends AbstractMainDeploymentProcessor {
     @Override
     protected ChangeSet doExecute(final Deployment deployment, final ProcessorExecution execution, final ChangeSet
         filteredChangeSet) throws DeployerException {
+    	//connect at execution time so that ProfileCredentialsProvider tokens do not expire
+    	AmazonDynamoDB client = getClient();
 
         for(String table : tables) {
             logger.info("Scanning table '{}'", table);
@@ -152,5 +159,14 @@ public class DynamoIndexingProcessor extends AbstractMainDeploymentProcessor {
     public void destroy() throws DeployerException {
 
     }
-
+    
+    private AmazonDynamoDB getClient() {
+        AmazonDynamoDBClientBuilder builder = AmazonDynamoDBClientBuilder.standard()
+                                                .withRegion(region);
+        if(credentialsProvider != null) {
+            builder.withCredentials(credentialsProvider);
+        }
+        
+        return builder.build();
+    }
 }
