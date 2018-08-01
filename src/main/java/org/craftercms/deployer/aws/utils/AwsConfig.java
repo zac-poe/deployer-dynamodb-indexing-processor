@@ -18,6 +18,8 @@
 package org.craftercms.deployer.aws.utils;
 
 import org.apache.commons.configuration2.Configuration;
+import org.apache.commons.lang.StringUtils;
+
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
@@ -44,7 +46,7 @@ public abstract class AwsConfig {
     }
 
     public static AWSCredentialsProvider getCredentials(final Configuration config) {
-        if(config.containsKey(ACCESS_KEY_CONFIG_KEY)) {
+        if(StringUtils.isNotBlank(config.getString(ACCESS_KEY_CONFIG_KEY))) {
             return new AWSStaticCredentialsProvider(new BasicAWSCredentials(config.getString(ACCESS_KEY_CONFIG_KEY),
                 config.getString(SECRET_KEY_CONFIG_KEY)));
         } else {
