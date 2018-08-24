@@ -21,6 +21,7 @@ import java.util.Map;
 
 import org.apache.commons.lang.StringUtils;
 import org.craftercms.search.service.SearchService;
+import org.craftercms.search.exception.SearchException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.amazonaws.services.dynamodbv2.document.ItemUtils;
@@ -79,7 +80,11 @@ public class SearchHelper {
         }
         logger.debug("Indexing doc with id '{}'", id);
         String xml = xmlMapper.writeValueAsString(map);
-        searchService.update(siteName, siteName, id, xml, true);
+        try {
+            searchService.update(siteName, siteName, id, xml, true);
+        } catch (SearchException e) {
+            logger.error("Failed to index doc into search index!", e);
+        }
     }
 
     /**
