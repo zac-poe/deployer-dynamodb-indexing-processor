@@ -53,6 +53,9 @@ credential provider chain will be used. [More info](https://docs.aws.amazon.com/
 If `aws.kinesis.metrics.enabled` is set to true the credentials used need to include write permissions for AWS 
 CloudWatch. `aws.kinesis.metrics.level` must be a value from `NONE`, `SUMMARY` or `DETAILED`.
 
+Both processors support a boolean configuration `continueOnError` to indicate if they should skip records that fail 
+to index instead of retrying the operation. The flag will default to `true` if its not present.
+
 In order to support delete events from DynamoDB the stream must be configured to include the old image of the records.
 
 ```yaml
@@ -83,6 +86,7 @@ target:
       
       - processorName: kinesisIndexingProcessor
         dynamoStream: ${aws.kinesis.useDynamo}
+        continueOnError: false
       - processorName: dynamoIndexingProcessor
         tables:
           - table1
