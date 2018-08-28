@@ -35,6 +35,7 @@ public abstract class AwsConfig {
     public static final String SECRET_KEY_CONFIG_KEY = "credentials.secretKey";
     public static final String REGION_CONFIG_KEY = "region";
     public static final String DYNAMODB_STREAM_CONFIG_KEY = "dynamoStream";
+    public static final String CONTINUE_ON_ERROR_CONFIG_KEY = "continueOnError";
 
     public static final String WORKERS_CONFIG_KEY = "aws.kinesis.workers";
     public static final String WORKER_APP_NAME_CONFIG_KEY = "appName";
@@ -43,6 +44,10 @@ public abstract class AwsConfig {
 
     public static boolean getUseDynamo(final Configuration config) {
         return config.getBoolean(DYNAMODB_STREAM_CONFIG_KEY, false);
+    }
+
+    public static boolean getContinueOnError(final Configuration config) {
+        return config.getBoolean(CONTINUE_ON_ERROR_CONFIG_KEY, true);
     }
 
     public static AWSCredentialsProvider getCredentials(final Configuration config) {

@@ -31,6 +31,7 @@ import org.craftercms.deployer.aws.utils.SearchHelper;
 import org.craftercms.deployer.impl.DeploymentConstants;
 import org.craftercms.deployer.impl.processors.AbstractMainDeploymentProcessor;
 import org.craftercms.search.exception.SearchException;
+import org.craftercms.search.exception.SearchServerException;
 import org.craftercms.search.service.SearchService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,6 +62,11 @@ public class DynamoIndexingProcessor extends AbstractMainDeploymentProcessor {
     protected List<String> tables;
 
     /**
+     * Indicates if the processor should skip records that fail to index.
+     */
+    protected boolean continueOnError;
+
+    /**
      * Helper to perform indexing.
      */
     protected SearchHelper searchHelper = new SearchHelper();
@@ -87,7 +93,9 @@ public class DynamoIndexingProcessor extends AbstractMainDeploymentProcessor {
     @Override
     protected void doInit(final Configuration config) throws DeployerException {
         tables = config.getList(String.class, TABLES_CONFIG_KEY);
-        
+
+        continueOnError = AwsConfig.getContinueOnError(config);
+
         //save state for connecting at execution time
         region = AwsConfig.getRegionName(config);
         credentialsProvider = AwsConfig.getCredentials(config);
@@ -115,9 +123,12 @@ public class DynamoIndexingProcessor extends AbstractMainDeploymentProcessor {
                     try {
                         searchHelper.update(searchService, siteName, ItemUtils.toItem(map).asMap());
                         return true;
-                    } catch (Exception e) {
-                        logger.warn("Indexing failed, will retry", e);
+                    } catch (SearchServerException e) {
+                        logger.error("Search server is unavailable, will retry", e);
                         return false;
+                    } catch (Exception e) {
+                        logger.error("Processing of record failed", e);
+                        return continueOnError;
                     }
                 });
             }
@@ -126,9 +137,12 @@ public class DynamoIndexingProcessor extends AbstractMainDeploymentProcessor {
             try {
                 searchService.commit(siteName);
                 return true;
-            } catch (SearchException e) {
-                logger.warn("Commit failed, will retry", e);
+            } catch (SearchServerException e) {
+                logger.error("Search server is unavailable, will retry", e);
                 return false;
+            } catch (SearchException e) {
+                logger.error("Commit failed", e);
+                return continueOnError;
             }
         });
 
