@@ -31,6 +31,7 @@ import org.craftercms.deployer.aws.utils.AwsConfig;
 import org.craftercms.deployer.aws.utils.Retry;
 import org.craftercms.deployer.aws.utils.SearchHelper;
 import org.craftercms.deployer.impl.processors.AbstractMainDeploymentProcessor;
+import org.craftercms.search.exception.SearchServerException;
 import org.craftercms.search.service.SearchService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +47,8 @@ import com.amazonaws.services.kinesis.model.Record;
  * <ul>
  *     <li><strong>dynamoStream:</strong> Indicates if the AWS DynamoDB Stream Adapter should be used, defaults to
  *     {@code false}</li>
+ *     <li><strong>continueOnError:</strong> Indicates if the processor should skip records that fail to be indexed,
+ *     defaults to {@code true}</li>
  * </ul>
  *
  * @author joseross
@@ -56,6 +59,8 @@ public class KinesisIndexingProcessor extends AbstractMainDeploymentProcessor {
     private static final Logger logger = LoggerFactory.getLogger(KinesisIndexingProcessor.class);
 
     protected boolean useDynamo;
+
+    protected boolean continueOnError;
 
     protected SearchHelper searchHelper = new SearchHelper();
 
@@ -70,6 +75,7 @@ public class KinesisIndexingProcessor extends AbstractMainDeploymentProcessor {
      */
     protected void doInit(final Configuration config) throws DeployerException {
         useDynamo = AwsConfig.getUseDynamo(config);
+        continueOnError = AwsConfig.getContinueOnError(config);
     }
 
     /**
@@ -83,7 +89,7 @@ public class KinesisIndexingProcessor extends AbstractMainDeploymentProcessor {
             Retry.untilTrue(() -> {
                 try {
                     if (useDynamo) {
-                        RecordAdapter adapter = (RecordAdapter) record;
+                        RecordAdapter adapter = (RecordAdapter)record;
                         com.amazonaws.services.dynamodbv2.model.Record dynamoRecord = adapter.getInternalObject();
                         switch (dynamoRecord.getEventName()) {
                             case "REMOVE":
@@ -102,9 +108,12 @@ public class KinesisIndexingProcessor extends AbstractMainDeploymentProcessor {
                         searchHelper.update(searchService, siteName, searchHelper.getDocFromKinesis(record));
                         return true;
                     }
-                } catch (Exception e) {
-                    logger.warn("Indexing failed, will retry", e);
+                } catch (SearchServerException e) {
+                    logger.error("Search server is unavailable, will retry", e);
                     return false;
+                } catch (Exception e) {
+                    logger.error("Processing of record failed", e);
+                    return continueOnError;
                 }
             });
         }
@@ -113,9 +122,12 @@ public class KinesisIndexingProcessor extends AbstractMainDeploymentProcessor {
                logger.debug("Committing all changes for site '{}'", siteName);
                searchService.commit(siteName);
                return true;
-           } catch (Exception e) {
-               logger.warn("Commit failed, will retry", e);
+           } catch (SearchServerException e) {
+               logger.error("Search server is unavailable, will retry", e);
                return false;
+           } catch (Exception e) {
+               logger.error("Commit failed", e);
+               return continueOnError;
            }
         });
 
