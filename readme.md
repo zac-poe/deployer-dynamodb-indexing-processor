@@ -86,7 +86,7 @@ target:
       
       - processorName: kinesisIndexingProcessor
         dynamoStream: ${aws.kinesis.useDynamo}
-        continueOnError: false
+        continueOnError: true
       - processorName: dynamoIndexingProcessor
         tables:
           - table1
