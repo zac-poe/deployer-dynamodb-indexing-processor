@@ -40,6 +40,7 @@ import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
 import com.amazonaws.services.dynamodbv2.document.ItemUtils;
+import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.ScanRequest;
 import com.amazonaws.services.dynamodbv2.model.ScanResult;
 
@@ -114,24 +115,34 @@ public class DynamoIndexingProcessor extends AbstractMainDeploymentProcessor {
     	AmazonDynamoDB client = getClient();
 
         for(String table : tables) {
-            logger.info("Scanning table '{}'", table);
-            ScanRequest request = new ScanRequest().withTableName(table);
-            ScanResult result = client.scan(request);
-            logger.info("Found {} items", result.getCount());
-            for(Map map : result.getItems()){
-                Retry.untilTrue(() -> {
-                    try {
-                        searchHelper.update(searchService, siteName, ItemUtils.toItem(map).asMap());
-                        return true;
-                    } catch (SearchServerException e) {
-                        logger.error("Search server is unavailable, will retry", e);
-                        return false;
-                    } catch (Exception e) {
-                        logger.error("Processing of record failed", e);
-                        return continueOnError;
-                    }
-                });
-            }
+            logger.info("Starting scan for table '{}'", table);
+            Map<String, AttributeValue> lastKeyEvaluated = null;
+            do {
+                ScanRequest request = new ScanRequest()
+                                        .withTableName(table)
+                                        .withExclusiveStartKey(lastKeyEvaluated);
+                ScanResult result = client.scan(request);
+                logger.info("Processing {} items", result.getCount());
+                for (Map map : result.getItems()) {
+                    Retry.untilTrue(() -> {
+                        try {
+                            searchHelper.update(searchService, siteName, ItemUtils.toItem(map).asMap());
+                            return true;
+                        } catch (SearchServerException e) {
+                            logger.error("Search server is unavailable, will retry", e);
+                            return false;
+                        } catch (Exception e) {
+                            logger.error("Processing of record failed", e);
+                            return continueOnError;
+                        }
+                    });
+                }
+                lastKeyEvaluated = result.getLastEvaluatedKey();
+                if(lastKeyEvaluated != null) {
+                    logger.info("Will try to fetch next batch of items");
+                }
+            } while (lastKeyEvaluated != null);
+            logger.info("Scan complete for table '{}'", table);
         }
         Retry.untilTrue(() -> {
             try {
