@@ -86,9 +86,8 @@ public abstract class AbstractKinesisRecordProcessor implements IRecordProcessor
         logger.info("Shutting down");
         if (!failed && shutdownInput.getShutdownReason() == ShutdownReason.TERMINATE) {
             try {
-                shutdownInput.getCheckpointer().checkpoint();
-            }
-            catch (Exception e) {
+                checkpoint(shutdownInput.getCheckpointer());
+            } catch (Exception e) {
                 logger.error("Error shutting down", e);
             }
         }
