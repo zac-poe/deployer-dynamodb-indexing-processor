@@ -17,9 +17,13 @@
 
 package org.craftercms.deployer.aws.processor;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration2.Configuration;
 import org.craftercms.deployer.api.ChangeSet;
 import org.craftercms.deployer.api.Deployment;
@@ -56,6 +60,8 @@ public class DynamoIndexingProcessor extends AbstractMainDeploymentProcessor {
     private static final Logger logger = LoggerFactory.getLogger(DynamoIndexingProcessor.class);
 
     public static final String TABLES_CONFIG_KEY = "tables";
+
+    public static final String TABLES_DEPLOY_PARAMETER = "dynamo_tables";
 
     /**
      * Name of the tables to scan.
@@ -114,7 +120,7 @@ public class DynamoIndexingProcessor extends AbstractMainDeploymentProcessor {
     	//connect at execution time so that ProfileCredentialsProvider tokens do not expire
     	AmazonDynamoDB client = getClient();
 
-        for(String table : tables) {
+        for(String table : getTargetTables(deployment)) {
             logger.info("Starting scan for table '{}'", table);
             Map<String, AttributeValue> lastKeyEvaluated = null;
             do {
@@ -160,7 +166,7 @@ public class DynamoIndexingProcessor extends AbstractMainDeploymentProcessor {
         return null;
     }
 
-    /**
+	/**
      * {@inheritDoc}
      */
     @Override
@@ -194,4 +200,26 @@ public class DynamoIndexingProcessor extends AbstractMainDeploymentProcessor {
         
         return builder.build();
     }
+
+    private Collection<String> getTargetTables(Deployment deployment) {
+    	//support passing a single or multiple values
+    	Object tableParam = deployment.getParam(TABLES_DEPLOY_PARAMETER);
+
+    	Collection<String> result = null;
+    	if(tableParam instanceof String) {
+    		result = Arrays.asList((String) tableParam);
+    	} else if(tableParam instanceof List) {
+    		result = (List<String>) tableParam;
+    	}
+    	
+    	if(result != null) {
+    		logger.debug("Re-indexing request originally requested tables: {}, available configured tables: {}", result, tables);
+    		result = CollectionUtils.retainAll(result, tables);
+    		logger.info("Re-indexing only requested tables: {}", result);
+    	} else {
+    		logger.debug("No target tables provided, all configured tables will be re-indexed");
+    		result = new ArrayList<>(tables);
+    	}
+    	return result;
+	}
 }
