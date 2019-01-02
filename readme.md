@@ -97,3 +97,17 @@ target:
         region: ${aws.region}
 
 ```
+
+## Processor Invocation
+
+The Kinesis indexing processor runs as data is published to the respective configured DynamoDB table.
+
+The Dynamo indexing processor is for full re-indexing of all, or a subset of the configured DynamoDB tables.
+
+### Dynamo Reindexing
+
+This processor is explicitly invoked through the [Deploy Target](https://docs.craftercms.org/en/3.0/developers/projects/deployer/api/target-management/deploy-target.html) endpoint.
+
+The `reprocess_all_files` parameter must be `true` for this processor to be triggered.
+
+Optionally, the `dynamo_tables` parameter may be passed. If provided, re-indexing will target only the requested tables, allowing for a targeted subset of re-indexing. This parameter supports either a list of tables, such as `["table1", "table2", "table3"]`, or a single value, like `"table"`.
