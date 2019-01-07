@@ -82,7 +82,11 @@ public class DeploymentKinesisProcessor extends AbstractKinesisRecordProcessor {
         Map<String, Object> params = new HashMap<>();
         params.put(RECORDS_PARAM_NAME, records);
         Deployment deployment = deploymentService.deployTarget(environment, siteName, waitTillDone, params);
-        return deployment.getStatus() == Deployment.Status.SUCCESS;
+        boolean result = deployment.getStatus() == Deployment.Status.SUCCESS;
+        if(!result) {
+        	logger.warn("Deployment was not successful: {}", deployment);
+        }
+        return result;
     }
 
 }

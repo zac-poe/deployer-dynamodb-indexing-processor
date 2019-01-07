@@ -70,7 +70,11 @@ public abstract class AbstractKinesisRecordProcessor implements IRecordProcessor
                     checkpoint(processRecordsInput.getCheckpointer());
                     nextCheckpointTimeInMillis = System.currentTimeMillis() + CHECKPOINT_INTERVAL_MILLIS;
                 }
+                logger.info("Successfully processed records");
+                //TODO: this flag may need to be flipped back
+                //failed = false;
             } else {
+            	logger.error("Failed processing records!");
                 failed = true;
             }
         } catch (Exception e) {
@@ -83,13 +87,15 @@ public abstract class AbstractKinesisRecordProcessor implements IRecordProcessor
      * {@inheritDoc}
      */
     public void shutdown(final ShutdownInput shutdownInput) {
-        logger.info("Shutting down");
+        logger.info("Shutting down: {}", shutdownInput.getShutdownReason());
         if (!failed && shutdownInput.getShutdownReason() == ShutdownReason.TERMINATE) {
             try {
                 checkpoint(shutdownInput.getCheckpointer());
             } catch (Exception e) {
-                logger.error("Error shutting down", e);
+                logger.error("Error creating checkpoint during shutdown", e);
             }
+        } else if (failed) {
+        	logger.warn("Shutting down without creating checkpoint since previous processing of records failed");
         }
     }
 
