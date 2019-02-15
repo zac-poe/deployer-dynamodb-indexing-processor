@@ -34,6 +34,20 @@ The following beans need to be added to the target context configuration:
 </beans>
 ```
 
+#### DeploymentKinesisProcessorFactory Options
+
+`maxProcessingRetries` - Defines a maximum number of times the processor will attempt to process a single record set (when encountering failures). A negative value indicates to retry indefinitely. The default number of retries is 3.
+
+`maxCheckpointRetries` - Defines a maximum number of times the processor will attempt to checkpoint (when encountering DynamoDB throttling). A negative value indicates to retry indefinitely. The default number of retries is 10.
+
+Example customization:  
+```
+    <bean id="kinesisFactory" class="org.craftercms.deployer.aws.kinesis.DeploymentKinesisProcessorFactory">
+        <property name="maxProcessingRetries" value="-1"/>
+        <property name="maxCheckpointRetries" value="15"/>
+    </bean>
+```
+
 ### Target Configuration
 
 At least one worker must be defined under `aws.kinesis.workers`. The Kinesis Client Library configuration must follow

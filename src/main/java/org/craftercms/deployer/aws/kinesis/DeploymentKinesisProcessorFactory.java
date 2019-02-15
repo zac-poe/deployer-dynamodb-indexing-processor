@@ -43,6 +43,16 @@ public class DeploymentKinesisProcessorFactory implements IRecordProcessorFactor
     protected String siteName;
 
     /**
+     * Maximum retries for processing a record set (negative value indicates to retry indefinitely until successful)
+     */
+    protected int maxProcessingRetries = 3;
+
+    /**
+     * Maximum retries for checkpointing (negative value indicates to retry indefinitely until successful)
+     */
+    protected int maxCheckpointRetries = 10;
+
+    /**
      * Instance of the {@link DeploymentService}.
      */
     @Autowired
@@ -52,7 +62,6 @@ public class DeploymentKinesisProcessorFactory implements IRecordProcessorFactor
      * {@inheritDoc}
      */
     public IRecordProcessor createProcessor() {
-        return new DeploymentKinesisProcessor(environment, siteName, true, deploymentService);
+        return new DeploymentKinesisProcessor(environment, siteName, maxProcessingRetries, maxCheckpointRetries, deploymentService);
     }
-
 }
