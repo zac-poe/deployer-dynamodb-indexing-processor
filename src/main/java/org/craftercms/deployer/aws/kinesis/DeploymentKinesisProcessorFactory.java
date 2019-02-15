@@ -80,4 +80,12 @@ public class DeploymentKinesisProcessorFactory implements IRecordProcessorFactor
 	private String getRetryDescription(int attempts) {
 		return AbstractKinesisRecordProcessor.isInfiniteAttempts(attempts) ? "indefinite" : (attempts + " attempts");
 	}
+
+	public void setMaxProcessingRetries(int maxProcessingRetries) {
+		this.maxProcessingRetries = maxProcessingRetries;
+	}
+
+	public void setMaxCheckpointRetries(int maxCheckpointRetries) {
+		this.maxCheckpointRetries = maxCheckpointRetries;
+	}
 }
