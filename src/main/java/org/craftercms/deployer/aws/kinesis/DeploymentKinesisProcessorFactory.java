@@ -18,6 +18,9 @@
 package org.craftercms.deployer.aws.kinesis;
 
 import org.craftercms.deployer.api.DeploymentService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import com.amazonaws.services.kinesis.clientlibrary.interfaces.v2.IRecordProcessor;
@@ -28,7 +31,9 @@ import com.amazonaws.services.kinesis.clientlibrary.interfaces.v2.IRecordProcess
  *
  * @author joseross
  */
-public class DeploymentKinesisProcessorFactory implements IRecordProcessorFactory {
+public class DeploymentKinesisProcessorFactory implements IRecordProcessorFactory, InitializingBean {
+
+    private static final Logger logger = LoggerFactory.getLogger(DeploymentKinesisProcessorFactory.class);
 
     /**
      * Environment to perform deployments.
@@ -64,4 +69,15 @@ public class DeploymentKinesisProcessorFactory implements IRecordProcessorFactor
     public IRecordProcessor createProcessor() {
         return new DeploymentKinesisProcessor(environment, siteName, maxProcessingRetries, maxCheckpointRetries, deploymentService);
     }
+
+	@Override
+	public void afterPropertiesSet() throws Exception {
+        logger.info("Kinesis record processors will be created using: processing max retries: {}, checkpoint max retries: {}",
+        		getRetryDescription(maxProcessingRetries),
+        		getRetryDescription(maxCheckpointRetries));
+    }
+
+	private String getRetryDescription(int attempts) {
+		return AbstractKinesisRecordProcessor.isInfiniteAttempts(attempts) ? "indefinite" : (attempts + " attempts");
+	}
 }

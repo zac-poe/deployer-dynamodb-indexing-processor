@@ -81,7 +81,7 @@ public abstract class AbstractKinesisRecordProcessor implements IRecordProcessor
         List<Record> records = processRecordsInput.getRecords();
         logger.info("Processing {} records from {}", records.size(), kinesisShardId);
 
-        for(int i= 0; isInfinite(maxProcessingRetries) || i <= maxProcessingRetries; i++) {
+        for(int i= 0; isInfiniteAttempts(maxProcessingRetries) || i <= maxProcessingRetries; i++) {
 	        if(tryProcessRecords(records)) {
 	            if (System.currentTimeMillis() > nextCheckpointTimeInMillis) {
 	                checkpoint(processRecordsInput.getCheckpointer());
@@ -90,7 +90,7 @@ public abstract class AbstractKinesisRecordProcessor implements IRecordProcessor
 	            handleProcessRecordsSuccess(processRecordsInput);
 	            break;
 	        } else {
-	        	if(!isInfinite(maxProcessingRetries) && i >= maxProcessingRetries) {
+	        	if(!isInfiniteAttempts(maxProcessingRetries) && i >= maxProcessingRetries) {
 	        		handleProcessRecordsFailure(processRecordsInput, i+1);
 	        	} else {
 		        	logger.warn("Unable to process kinesis stream records - attempt {}", i+1);
@@ -140,7 +140,7 @@ public abstract class AbstractKinesisRecordProcessor implements IRecordProcessor
      */
     protected void checkpoint(IRecordProcessorCheckpointer checkpointer) {
         logger.info("Checkpointing shard " + kinesisShardId);
-        for (int i = 0; isInfinite(maxCheckpointRetries) || i <= maxCheckpointRetries; i++) {
+        for (int i = 0; isInfiniteAttempts(maxCheckpointRetries) || i <= maxCheckpointRetries; i++) {
             try {
                 checkpointer.checkpoint();
                 break;
@@ -150,11 +150,11 @@ public abstract class AbstractKinesisRecordProcessor implements IRecordProcessor
                 break;
             } catch (ThrottlingException | KinesisClientLibDependencyException e) {
                 // Backoff and re-attempt checkpoint upon transient failures
-                if (!isInfinite(maxCheckpointRetries) && i >= maxCheckpointRetries) {
+                if (!isInfiniteAttempts(maxCheckpointRetries) && i >= maxCheckpointRetries) {
                 	handleCheckpointFailure(checkpointer, i+1, e);
                 } else {
                     logger.info("Transient issue when checkpointing - attempt " + (i+1)
-                    		+ (isInfinite(maxCheckpointRetries) ? "" : " of " + maxCheckpointRetries), e);
+                    		+ (isInfiniteAttempts(maxCheckpointRetries) ? "" : " of " + maxCheckpointRetries), e);
                     sleep();
                 }
             } catch (InvalidStateException e) {
@@ -182,7 +182,11 @@ public abstract class AbstractKinesisRecordProcessor implements IRecordProcessor
 		return System.currentTimeMillis() + CHECKPOINT_INTERVAL_MILLIS;
 	}
 
-    private boolean isInfinite(int val) {
+	/**
+	 * @param val number of check
+	 * @return True if attempts represent an infinite value, false otherwise
+	 */
+    public static boolean isInfiniteAttempts(int val) {
     	return val < 0;
     }
 

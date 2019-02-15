@@ -22,4 +22,14 @@ public class DeploymentKinesisProcessorFactoryTest {
 	public void testDefaultCheckpointRetriesAreDefined() {
 		assertThat(target.maxCheckpointRetries).isGreaterThan(0);
 	}
+
+	@Test
+	public void testConfigurationIsLogged() throws Exception {
+		target.afterPropertiesSet();
+		//verify log with attempts
+		
+		target.maxProcessingRetries = target.maxCheckpointRetries = -1;
+		target.afterPropertiesSet();
+		//veirfy log with indefinite
+	}
 }
