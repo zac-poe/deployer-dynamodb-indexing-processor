@@ -17,6 +17,14 @@
 
 package org.craftercms.deployer.aws.processor;
 
+import com.amazonaws.auth.AWSCredentialsProvider;
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
+import com.amazonaws.services.dynamodbv2.document.ItemUtils;
+import com.amazonaws.services.dynamodbv2.model.AttributeValue;
+import com.amazonaws.services.dynamodbv2.model.ScanRequest;
+import com.amazonaws.services.dynamodbv2.model.ScanResult;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -40,13 +48,6 @@ import org.craftercms.search.service.SearchService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import com.amazonaws.auth.AWSCredentialsProvider;
-import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
-import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
-import com.amazonaws.services.dynamodbv2.document.ItemUtils;
-import com.amazonaws.services.dynamodbv2.model.AttributeValue;
-import com.amazonaws.services.dynamodbv2.model.ScanRequest;
-import com.amazonaws.services.dynamodbv2.model.ScanResult;
 
 /**
  * Implementation of {@link AbstractMainDeploymentProcessor} that indexes records directly from
@@ -58,8 +59,6 @@ import com.amazonaws.services.dynamodbv2.model.ScanResult;
 public class DynamoIndexingProcessor extends AbstractMainDeploymentProcessor {
 
     private static final Logger logger = LoggerFactory.getLogger(DynamoIndexingProcessor.class);
-
-    public static final String TABLES_CONFIG_KEY = "tables";
 
     public static final String TABLES_DEPLOY_PARAMETER = "dynamo_tables";
 
@@ -99,7 +98,7 @@ public class DynamoIndexingProcessor extends AbstractMainDeploymentProcessor {
      */
     @Override
     protected void doInit(final Configuration config) throws DeployerException {
-        tables = config.getList(String.class, TABLES_CONFIG_KEY);
+        tables = config.getList(String.class, AwsConfig.TABLES_CONFIG_KEY);
 
         continueOnError = AwsConfig.getContinueOnError(config);
 
@@ -107,8 +106,11 @@ public class DynamoIndexingProcessor extends AbstractMainDeploymentProcessor {
         region = AwsConfig.getRegionName(config);
         credentialsProvider = AwsConfig.getCredentials(config);
 
-        logger.info("Connecting with " +
-    		(credentialsProvider != null ? "access keys" : "IAM role default credentials provider"));
+        logger.info("Dynamo Reindexing Processor will execute on tables: {}, with skip failing records: {}",
+        		tables, continueOnError);
+        logger.info("Connecting with {} on region {}",
+        		credentialsProvider != null ? "access keys" : "IAM role default credentials provider",
+        		region);
     }        
 
     /**
@@ -150,16 +152,14 @@ public class DynamoIndexingProcessor extends AbstractMainDeploymentProcessor {
             } while (lastKeyEvaluated != null);
             logger.info("Scan complete for table '{}'", table);
         }
+        
         Retry.untilTrue(() -> {
             try {
                 searchService.commit(siteName);
                 return true;
-            } catch (SearchServerException e) {
+            } catch (SearchException e) {
                 logger.error("Search server is unavailable, will retry", e);
                 return false;
-            } catch (SearchException e) {
-                logger.error("Commit failed", e);
-                return continueOnError;
             }
         });
 

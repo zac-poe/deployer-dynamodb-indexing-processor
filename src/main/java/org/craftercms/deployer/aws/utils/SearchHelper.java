@@ -55,11 +55,12 @@ public class SearchHelper {
         	logger.error("Unable to delete doc without old image from site '{}'!", site);
         	return;
 		}
-		String id = ItemUtils.toItem(oldImage).getString("id");
+		String id = ItemUtils.toItem(oldImage).getString(ID_FIELD);
 		if(StringUtils.isEmpty(id)) {
         	logger.error("Unable to delete doc from site '{}' with no field '{}' defined!", site, ID_FIELD);
         	return;
 		}
+        logger.debug("Deleting doc with id '{}'", id);
         searchService.delete(site, site, id);
     }
 
@@ -97,7 +98,7 @@ public class SearchHelper {
      * @param record record to transform
      * @return values as a map
      */
-    public Map getDocFromDynamo(com.amazonaws.services.dynamodbv2.model.Record record) {
+    public Map<String, Object> getDocFromDynamo(com.amazonaws.services.dynamodbv2.model.Record record) {
         return ItemUtils.toItem(record.getDynamodb().getNewImage()).asMap();
     }
 

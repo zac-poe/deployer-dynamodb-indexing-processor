@@ -6,7 +6,7 @@
 
     <groupId>org.craftercms</groupId>
     <artifactId>deployer-aws-processors</artifactId>
-    <version>3.0.17</version>
+    <version>3.0.18</version>
 
     <name>Crafter Deployer AWS Processors</name>
     <description>Crafter Deployer AWS Processors</description>
