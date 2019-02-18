@@ -79,7 +79,7 @@ public abstract class AbstractKinesisRecordProcessor implements IRecordProcessor
     @Override
     public void processRecords(final ProcessRecordsInput processRecordsInput) {
         List<Record> records = processRecordsInput.getRecords();
-        logger.info("Processing {} records from {}", records.size(), kinesisShardId);
+        logger.info("Processing {} record(s) from {}", records.size(), kinesisShardId);
 
         for(int i= 0; isInfiniteAttempts(maxProcessingRetries) || i <= maxProcessingRetries; i++) {
 	        if(tryProcessRecords(records)) {

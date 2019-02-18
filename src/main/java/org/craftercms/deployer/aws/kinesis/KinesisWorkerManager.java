@@ -120,7 +120,7 @@ public class KinesisWorkerManager {
             if(useDynamo) {
                 builder.kinesisClient(new AmazonDynamoDBStreamsAdapterClient(provider));
             }
-            logger.info("Creating worker {} on app {} on region {} at position {} assuming {} records, with metrics {}",
+            logger.info("Creating worker {} for app {} on region {} at initial position {} assuming {} records, with metrics {}",
             		workerId,
             		appName,
             		region,
