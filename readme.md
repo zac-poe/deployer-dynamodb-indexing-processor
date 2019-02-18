@@ -38,7 +38,7 @@ The following beans need to be added to the target context configuration:
        xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
        http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
 
-	<!-- kinesis worker management -->
+    <!-- kinesis worker management -->
     <bean id="kinesisIndexingProcessorFactory" class="org.craftercms.deployer.aws.kinesis.KinesisIndexingProcessorFactory"/>
     <bean id="kinesisWorkerManager" class="org.craftercms.deployer.aws.kinesis.KinesisWorkerManager"/>
 
