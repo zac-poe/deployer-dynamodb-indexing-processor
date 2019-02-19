@@ -40,6 +40,8 @@ import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.HierarchicalConfiguration;
 import org.apache.commons.lang3.StringUtils;
 import org.craftercms.deployer.aws.utils.AwsConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 
@@ -51,28 +53,28 @@ import org.springframework.beans.factory.annotation.Value;
 @SuppressWarnings("rawtypes")
 public class KinesisWorkerManager {
 
-    @Value("${aws.region}")
+    private static final Logger logger = LoggerFactory.getLogger(KinesisWorkerManager.class);
+
+    @Value("${" + AwsConfig.AWS_SECTION + "." + AwsConfig.REGION_CONFIG_KEY + "}")
     protected String region;
 
-    @Value("${aws.kinesis.initialPosition:LATEST}")
+    @Value("${" + AwsConfig.STREAM_INITIAL_POSITION_KEY + ":LATEST}")
     protected InitialPositionInStream initialPosition;
 
-    @Value("${aws.kinesis.useDynamo}")
+    @Value("${" + AwsConfig.IS_DYNAMO_CONFIG_KEY + ":" + AwsConfig.IS_DYNAMO_DEFAULT + "}")
     protected boolean useDynamo;
 
-    @Value("${aws.kinesis.metrics.enabled:false}")
+    @Value("${" + AwsConfig.KINESIS_METRICS_ENABLED_KEY + ":false}")
     protected boolean useMetrics;
 
-    @Value("${aws.kinesis.metrics.level:NONE}")
+    @Value("${" + AwsConfig.KINESIS_METRICS_LEVEL_KEY + ":NONE}")
     protected MetricsLevel metricsLevel;
-
-    @Value("${aws.credentials.accessKey:}")
+    
+    @Value("${" + AwsConfig.AWS_SECTION + "." + AwsConfig.ACCESS_KEY_CONFIG_KEY + ":}")
     protected String accessKey;
 
-    @Value("${aws.credentials.secretKey:}")
+    @Value("${" + AwsConfig.AWS_SECTION + "." + AwsConfig.SECRET_KEY_CONFIG_KEY + ":}")
     protected String secretKey;
-
-    protected Worker.Builder builder;
 
     protected ExecutorService executorService = Executors.newCachedThreadPool();
 
@@ -93,8 +95,10 @@ public class KinesisWorkerManager {
     public void init() {
         AWSCredentialsProvider provider;
         if(StringUtils.isEmpty(accessKey)) {
+            logger.info("Workers will connect assuming IAM role default credentials provider");
             provider = DefaultAWSCredentialsProviderChain.getInstance();
         } else {
+            logger.info("Workers will connect with access keys");
             provider = new AWSStaticCredentialsProvider(new BasicAWSCredentials(accessKey, secretKey));
         }
         List<Configuration> workers = targetConfig.configurationsAt(AwsConfig.WORKERS_CONFIG_KEY);
@@ -109,13 +113,18 @@ public class KinesisWorkerManager {
             if(useMetrics) {
                 configuration.withMetricsLevel(metricsLevel);
             }
-            builder = new Worker.Builder().recordProcessorFactory(processorFactory).config(configuration);
+            Worker.Builder builder = new Worker.Builder().recordProcessorFactory(processorFactory).config(configuration);
             if(!useMetrics) {
                 builder.metricsFactory(new NullMetricsFactory());
             }
             if(useDynamo) {
                 builder.kinesisClient(new AmazonDynamoDBStreamsAdapterClient(provider));
             }
+            logger.info("Creating worker on stream {} at initial position {} assuming {} records, with metrics {}",
+            		stream,
+            		initialPosition,
+            		useDynamo ? "dynamodb" : "kinesis",
+            		useMetrics ? String.format("enabled at %s level", metricsLevel) : "disabled");
             executorService.submit(builder.build());
         });
     }
@@ -127,5 +136,4 @@ public class KinesisWorkerManager {
     public void shutdown() {
         executorService.shutdown();
     }
-
 }

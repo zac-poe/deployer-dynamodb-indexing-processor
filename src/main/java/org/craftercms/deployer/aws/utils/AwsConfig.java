@@ -17,12 +17,12 @@
 
 package org.craftercms.deployer.aws.utils;
 
-import org.apache.commons.configuration2.Configuration;
-import org.apache.commons.lang.StringUtils;
-
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
+
+import org.apache.commons.configuration2.Configuration;
+import org.apache.commons.lang.StringUtils;
 
 /**
  * Extracts AWS related values from a {@link Configuration} instance.
@@ -34,20 +34,26 @@ public abstract class AwsConfig {
     public static final String ACCESS_KEY_CONFIG_KEY = "credentials.accessKey";
     public static final String SECRET_KEY_CONFIG_KEY = "credentials.secretKey";
     public static final String REGION_CONFIG_KEY = "region";
-    public static final String DYNAMODB_STREAM_CONFIG_KEY = "dynamoStream";
-    public static final String CONTINUE_ON_ERROR_CONFIG_KEY = "continueOnError";
+    public static final String CONTINUE_ON_ERROR_CONFIG_KEY = "skipFailingRecords";
 
-    public static final String WORKERS_CONFIG_KEY = "aws.kinesis.workers";
+    public static final String AWS_SECTION = "aws";
+    public static final String WORKERS_CONFIG_KEY = AWS_SECTION + ".kinesis.workers";
     public static final String WORKER_APP_NAME_CONFIG_KEY = "appName";
     public static final String WORKER_WORKER_ID_CONFIG_KEY = "workerId";
     public static final String WORKER_STREAM_CONFIG_KEY = "stream";
+    public static final String TABLES_CONFIG_KEY = "tables";
+    public static final String IS_DYNAMO_CONFIG_KEY = AWS_SECTION + ".kinesis.isDynamo";
+    public static final String STREAM_INITIAL_POSITION_KEY = AWS_SECTION + ".kinesis.initialPosition";
+    public static final String KINESIS_METRICS_ENABLED_KEY = AWS_SECTION + ".kinesis.metrics.enabled";
+    public static final String KINESIS_METRICS_LEVEL_KEY = AWS_SECTION + ".kinesis.metrics.level";
+    public static final String MAX_PROCESSING_RETRIES_KEY = AWS_SECTION + ".kinesis.maxProcessingRetries";
+    public static final String MAX_CHECKPOINT_RETRIES_KEY = AWS_SECTION + ".kinesis.maxCheckpointRetries";
 
-    public static boolean getUseDynamo(final Configuration config) {
-        return config.getBoolean(DYNAMODB_STREAM_CONFIG_KEY, false);
-    }
-
+    public static final String CONTINUE_ON_ERROR_DEFAULT = "true";
+    public static final String IS_DYNAMO_DEFAULT = "false";
+    
     public static boolean getContinueOnError(final Configuration config) {
-        return config.getBoolean(CONTINUE_ON_ERROR_CONFIG_KEY, true);
+        return config.getBoolean(CONTINUE_ON_ERROR_CONFIG_KEY, Boolean.valueOf(CONTINUE_ON_ERROR_DEFAULT));
     }
 
     public static AWSCredentialsProvider getCredentials(final Configuration config) {
