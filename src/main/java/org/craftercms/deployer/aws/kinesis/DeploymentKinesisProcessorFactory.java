@@ -50,12 +50,14 @@ public class DeploymentKinesisProcessorFactory implements IRecordProcessorFactor
     /**
      * Maximum retries for processing a record set (negative value indicates to retry indefinitely until successful)
      */
-    protected int maxProcessingRetries = 3;
+    @Value("${aws.kinesis.maxProcessingRetries:3}")
+    protected int maxProcessingRetries;
 
     /**
      * Maximum retries for checkpointing (negative value indicates to retry indefinitely until successful)
      */
-    protected int maxCheckpointRetries = 10;
+    @Value("${aws.kinesis.maxCheckpointRetries:10}")
+    protected int maxCheckpointRetries;
 
     /**
      * Instance of the {@link DeploymentService}.
@@ -79,13 +81,5 @@ public class DeploymentKinesisProcessorFactory implements IRecordProcessorFactor
 
 	private String getRetryDescription(int attempts) {
 		return AbstractKinesisRecordProcessor.isInfiniteAttempts(attempts) ? "indefinite" : (attempts + " attempts");
-	}
-
-	public void setMaxProcessingRetries(int maxProcessingRetries) {
-		this.maxProcessingRetries = maxProcessingRetries;
-	}
-
-	public void setMaxCheckpointRetries(int maxCheckpointRetries) {
-		this.maxCheckpointRetries = maxCheckpointRetries;
 	}
 }

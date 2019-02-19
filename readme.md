@@ -34,20 +34,6 @@ The following beans need to be added to the target context configuration:
 </beans>
 ```
 
-#### DeploymentKinesisProcessorFactory Options
-
-`maxProcessingRetries` - Defines a maximum number of times the processor will attempt to process a single record set (when encountering failures). A negative value indicates to retry indefinitely. The default number of retries is 3.
-
-`maxCheckpointRetries` - Defines a maximum number of times the processor will attempt to checkpoint (when encountering DynamoDB throttling). A negative value indicates to retry indefinitely. The default number of retries is 10.
-
-Example customization:  
-```
-    <bean id="kinesisFactory" class="org.craftercms.deployer.aws.kinesis.DeploymentKinesisProcessorFactory">
-        <property name="maxProcessingRetries" value="-1"/>
-        <property name="maxCheckpointRetries" value="15"/>
-    </bean>
-```
-
 ### Target Configuration
 
 At least one worker must be defined under `aws.kinesis.workers`. The Kinesis Client Library configuration must follow
@@ -60,6 +46,10 @@ these restrictions:
 
 `aws.intialPosition` is only needed if the processor should handle all pending records when it starts, the default
 behaviour is to only receive new ones after it is started.
+
+`aws.kinesis.maxProcessingRetries` - Defines a maximum number of times the processor will attempt to process a single record set (when encountering failures). A negative value indicates to retry indefinitely. The default number of retries is 3.
+
+`aws.kinesis.maxCheckpointRetries` - Defines a maximum number of times the processor will attempt to checkpoint (when encountering DynamoDB throttling). A negative value indicates to retry indefinitely. The default number of retries is 10.
 
 `aws.credentials` & `dynamoIndexingProcessor.credentials` are both optional, if they are not provided the default
 credential provider chain will be used. [More info](https://docs.aws.amazon.com/sdk-for-java/v1/developer-guide/credentials.html)
@@ -88,6 +78,8 @@ aws:
         stream: arn:aws:dynamodb:...
     initialPosition: TRIM_HORIZON
     useDynamo: true
+    maxProcessingRetries: -1
+    maxCheckpointRetries: 5
     metrics:
       enabled: true
       level: SUMMARY
