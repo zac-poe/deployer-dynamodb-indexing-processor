@@ -22,6 +22,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.amazonaws.services.kinesis.clientlibrary.exceptions.InvalidStateException;
+import com.amazonaws.services.kinesis.clientlibrary.exceptions.KinesisClientLibDependencyException;
 import com.amazonaws.services.kinesis.clientlibrary.exceptions.ShutdownException;
 import com.amazonaws.services.kinesis.clientlibrary.exceptions.ThrottlingException;
 import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessorCheckpointer;
@@ -42,53 +43,92 @@ public abstract class AbstractKinesisRecordProcessor implements IRecordProcessor
     private static final Logger logger = LoggerFactory.getLogger(AbstractKinesisRecordProcessor.class);
 
     private static final long BACKOFF_TIME_IN_MILLIS = 3000L;
-    private static final int NUM_RETRIES = 10;
     private static final long CHECKPOINT_INTERVAL_MILLIS = 60000L;
 
+    /**
+     * Maximum retries for processing a record set (negative value indicates to retry indefinitely until successful)
+     */
+    protected final int maxProcessingRetries;
+
+    /**
+     * Maximum retries for checkpointing (negative value indicates to retry indefinitely until successful)
+     */
+    protected final int maxCheckpointRetries;
+    
     protected long nextCheckpointTimeInMillis;
     protected String kinesisShardId;
-    protected boolean failed = false;
+    
+    public AbstractKinesisRecordProcessor(int maxProcessingRetries, int maxCheckpointRetries) {
+    	this.maxProcessingRetries = maxProcessingRetries;
+    	this.maxCheckpointRetries = maxCheckpointRetries;
+    }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void initialize(final InitializationInput initializationInput) {
         kinesisShardId = initializationInput.getShardId();
+        nextCheckpointTimeInMillis = getNextCheckpointTime();
         logger.info("Starting with shardId '{}'", kinesisShardId);
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void processRecords(final ProcessRecordsInput processRecordsInput) {
         List<Record> records = processRecordsInput.getRecords();
         logger.info("Processing {} records from {}", records.size(), kinesisShardId);
 
-        try {
-            if(processRecords(records)) {
-                if (System.currentTimeMillis() > nextCheckpointTimeInMillis) {
-                    checkpoint(processRecordsInput.getCheckpointer());
-                    nextCheckpointTimeInMillis = System.currentTimeMillis() + CHECKPOINT_INTERVAL_MILLIS;
-                }
-            } else {
-                failed = true;
-            }
-        } catch (Exception e) {
-            logger.error("Error processing records", e);
-            failed = true;
+        for(int i= 0; isInfiniteAttempts(maxProcessingRetries) || i <= maxProcessingRetries; i++) {
+	        if(tryProcessRecords(records)) {
+	            if (System.currentTimeMillis() > nextCheckpointTimeInMillis) {
+	                checkpoint(processRecordsInput.getCheckpointer());
+	                nextCheckpointTimeInMillis = getNextCheckpointTime();
+	            }
+	            handleProcessRecordsSuccess(processRecordsInput);
+	            break;
+	        } else {
+	        	if(!isInfiniteAttempts(maxProcessingRetries) && i >= maxProcessingRetries) {
+	        		handleProcessRecordsFailure(processRecordsInput, i+1);
+	        	} else {
+		        	logger.warn("Unable to process kinesis stream records - attempt {}", i+1);
+		        	sleep();
+	        	}
+	        }
         }
     }
 
     /**
+     * Any desired handling following successfully processing records
+     * @param processRecordsInput
+     */
+	protected void handleProcessRecordsSuccess(final ProcessRecordsInput processRecordsInput) {
+		logger.debug("Successfully processed records");
+	}
+
+    /**
+     * Any desired handling following failure to process records
+     * @param processRecordsInput
+     * @param attempt 1 based attempt counter
+     */
+	protected void handleProcessRecordsFailure(final ProcessRecordsInput processRecordsInput, final int attempt) {
+		logger.error("Failed to process kinesis stream records after {} attempts. Record processor will bypass this record set!", attempt);
+	}
+
+    /**
      * {@inheritDoc}
      */
+    @Override
     public void shutdown(final ShutdownInput shutdownInput) {
-        logger.info("Shutting down");
-        if (!failed && shutdownInput.getShutdownReason() == ShutdownReason.TERMINATE) {
+        logger.info("Shutting down: {}", shutdownInput.getShutdownReason());
+        if (shutdownInput.getShutdownReason() == ShutdownReason.TERMINATE) {
             try {
+            	logger.info("No records left on shard, creating final checkpoint");
                 checkpoint(shutdownInput.getCheckpointer());
             } catch (Exception e) {
-                logger.error("Error shutting down", e);
+                logger.error("Error creating checkpoint during shutdown", e);
             }
         }
     }
@@ -100,7 +140,7 @@ public abstract class AbstractKinesisRecordProcessor implements IRecordProcessor
      */
     protected void checkpoint(IRecordProcessorCheckpointer checkpointer) {
         logger.info("Checkpointing shard " + kinesisShardId);
-        for (int i = 0; i < NUM_RETRIES; i++) {
+        for (int i = 0; isInfiniteAttempts(maxCheckpointRetries) || i <= maxCheckpointRetries; i++) {
             try {
                 checkpointer.checkpoint();
                 break;
@@ -108,33 +148,65 @@ public abstract class AbstractKinesisRecordProcessor implements IRecordProcessor
                 // Ignore checkpoint if the processor instance has been shutdown (fail over).
                 logger.info("Caught shutdown exception, skipping checkpoint.", se);
                 break;
-            } catch (ThrottlingException e) {
+            } catch (ThrottlingException | KinesisClientLibDependencyException e) {
                 // Backoff and re-attempt checkpoint upon transient failures
-                if (i >= (NUM_RETRIES - 1)) {
-                    logger.error("Checkpoint failed after " + (i + 1) + "attempts.", e);
-                    break;
+                if (!isInfiniteAttempts(maxCheckpointRetries) && i >= maxCheckpointRetries) {
+                	handleCheckpointFailure(checkpointer, i+1, e);
                 } else {
-                    logger.info("Transient issue when checkpointing - attempt " + (i + 1) + " of "
-                        + NUM_RETRIES, e);
+                    logger.info("Transient issue when checkpointing - attempt " + (i+1)
+                    		+ (isInfiniteAttempts(maxCheckpointRetries) ? "" : " of " + maxCheckpointRetries), e);
+                    sleep();
                 }
             } catch (InvalidStateException e) {
-                // This indicates an issue with the DynamoDB table (check for table, provisioned IOPS).
+                // This indicates an issue with the DynamoDB table (check for table).
                 logger.error("Cannot save checkpoint to the DynamoDB table used by the Amazon Kinesis Client Library.", e);
                 break;
-            }
-            try {
-                Thread.sleep(BACKOFF_TIME_IN_MILLIS);
-            } catch (InterruptedException e) {
-                logger.debug("Interrupted sleep", e);
             }
         }
     }
 
     /**
-     * Performs the actual processing of the received records.
-     *
-     * @param records List of records to process
+     * Any desired handling following failure to checkpoint
+     * @param checkpointer
+     * @param attempt 1 based attempt counter
+     * @param cause throwable triggering checkpoint failure
      */
-    public abstract boolean processRecords(List<Record> records) throws Exception;
+	protected void handleCheckpointFailure(final IRecordProcessorCheckpointer checkpointer, final int attempt, final Throwable cause) {
+		logger.error("Checkpoint failed after " + attempt + "attempts.", cause);
+	}
 
+    /**
+     * @return ms time of next checkpoint interval
+     */
+	protected long getNextCheckpointTime() {
+		return System.currentTimeMillis() + CHECKPOINT_INTERVAL_MILLIS;
+	}
+
+	/**
+	 * @param val number of check
+	 * @return True if attempts represent an infinite value, false otherwise
+	 */
+    public static boolean isInfiniteAttempts(int val) {
+    	return val < 0;
+    }
+
+    /**
+     * Sleep between attempts for checkpoints or retrying processing of records
+     */
+	protected void sleep() {
+		try {
+		    Thread.sleep(BACKOFF_TIME_IN_MILLIS);
+		} catch (InterruptedException e) {
+		    logger.debug("Interrupted sleep", e);
+		}
+	}
+
+    /**
+     * Performs the actual processing of the received records.
+     * 
+     * @param records List of records to process
+     * @return true if processed successfully, false if processing should be re-attempted
+     * @throws {@link RuntimeException} if thrown, will skip processing of these records!
+     */
+    protected abstract boolean tryProcessRecords(List<Record> records);
 }

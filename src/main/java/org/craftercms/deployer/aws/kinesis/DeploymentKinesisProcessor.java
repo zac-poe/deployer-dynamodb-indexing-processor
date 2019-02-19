@@ -47,28 +47,23 @@ public class DeploymentKinesisProcessor extends AbstractKinesisRecordProcessor {
     /**
      * Environment to perform deployments.
      */
-    protected String environment;
+    protected final String environment;
 
     /**
      * Site to perform deployments.
      */
-    protected String siteName;
-
-    /**
-     * Indicates if the deployments should be executed synchronous.
-     */
-    protected boolean waitTillDone;
-
+    protected final String siteName;
+    
     /**
      * Instance of {@link DeploymentService}.
      */
     protected DeploymentService deploymentService;
 
-    public DeploymentKinesisProcessor(final String environment, final String siteName, final boolean waitTillDone,
-                                      final DeploymentService deploymentService) {
+    public DeploymentKinesisProcessor(final String environment, final String siteName, final int maxProcessingRetries,
+    		final int maxCheckpointRetries, final DeploymentService deploymentService) {
+        super(maxProcessingRetries, maxCheckpointRetries);
         this.environment = environment;
         this.siteName = siteName;
-        this.waitTillDone = waitTillDone;
         this.deploymentService = deploymentService;
     }
 
@@ -76,13 +71,20 @@ public class DeploymentKinesisProcessor extends AbstractKinesisRecordProcessor {
      * {@inheritDoc}
      */
     @Override
-    public boolean processRecords(final List<Record> records) throws TargetNotFoundException,
-        DeploymentServiceException {
+    protected boolean tryProcessRecords(final List<Record> records) {
         logger.info("Triggering deployment for '{}-{}'", environment, siteName);
         Map<String, Object> params = new HashMap<>();
         params.put(RECORDS_PARAM_NAME, records);
-        Deployment deployment = deploymentService.deployTarget(environment, siteName, waitTillDone, params);
-        return deployment.getStatus() == Deployment.Status.SUCCESS;
+        
+        boolean processedSuccessfully = false;
+		try {
+			//must wait for deployment completion so status can be evaluated
+			processedSuccessfully = deploymentService.deployTarget(environment, siteName, true, params)
+					.getStatus() == Deployment.Status.SUCCESS;
+		} catch (TargetNotFoundException | DeploymentServiceException e) {
+			logger.error("Unable to invoke deployment for " + environment + " on " + siteName, e);
+		}
+        
+        return processedSuccessfully;
     }
-
 }
