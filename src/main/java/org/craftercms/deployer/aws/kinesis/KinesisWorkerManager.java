@@ -120,10 +120,8 @@ public class KinesisWorkerManager {
             if(useDynamo) {
                 builder.kinesisClient(new AmazonDynamoDBStreamsAdapterClient(provider));
             }
-            logger.info("Creating worker {} for app {} on region {} at initial position {} assuming {} records, with metrics {}",
-            		workerId,
-            		appName,
-            		region,
+            logger.info("Creating worker on stream {} at initial position {} assuming {} records, with metrics {}",
+            		stream,
             		initialPosition,
             		useDynamo ? "dynamodb" : "kinesis",
             		useMetrics ? String.format("enabled at %s level", metricsLevel) : "disabled");

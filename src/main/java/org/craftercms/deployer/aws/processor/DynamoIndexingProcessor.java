@@ -106,7 +106,7 @@ public class DynamoIndexingProcessor extends AbstractMainDeploymentProcessor {
         region = AwsConfig.getRegionName(config);
         credentialsProvider = AwsConfig.getCredentials(config);
 
-        logger.info("Dynamo Reindexing Processor will execute on tables: {}, with skip failing records: {}",
+        logger.info("Dynamo Reindexing Processor will execute on tables: {}, with skip failed records: {}",
         		tables, continueOnError);
         logger.info("Connecting with {} on region {}",
         		credentialsProvider != null ? "access keys" : "IAM role default credentials provider",
